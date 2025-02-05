@@ -27,7 +27,6 @@ parser.add_argument('--bs', default=128, type=int, help='batch size')
 parser.add_argument('--epochs', default=10, type=int, help='epochs')
 parser.add_argument('--save', default='~/sharedscratch', type=str, help='directory of the dataset')
 
-
 best_acc = 0
 
 def main():
@@ -135,7 +134,7 @@ def main_worker(gpu, args):
         testset, batch_size=args.bs, shuffle=False, num_workers=2)
 
     # Check if GPUs are available, if so set device to CUDA
-    device = rank
+    device = args.rank
 
     # Initialise the VGG model
     print('==> Building model..')
