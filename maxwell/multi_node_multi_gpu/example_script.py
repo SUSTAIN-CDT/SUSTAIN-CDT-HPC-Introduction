@@ -26,14 +26,14 @@ parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
 parser.add_argument('--bs', default=128, type=int, help='batch size')
 parser.add_argument('--epochs', default=10, type=int, help='epochs')
 parser.add_argument('--save', default='~/sharedscratch', type=str, help='directory of the dataset')
-parser.add_argument('--gpus_node', default=1, type=int, help='number of gpus per node')
-parser.add_argument('--num_nodes', default=1, type=int, help='number of nodes')
 
 
 best_acc = 0
 
 def main():
     args = parser.parse_args()
+
+    args.port = 52473
 
     args.ngpus_per_node = torch.cuda.device_count()
     if "SLURM_JOB_ID" in os.environ:
