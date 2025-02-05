@@ -43,7 +43,7 @@ def main():
     print(f"WORLD SIZE: {args.world_size}")
     print(f"GPUs per Node: {args.gpus_node}")
 
-    mp.spawn(main_worker, nprocs=args.world_size, args=(args.gpus_node, args))
+    mp.spawn(main_worker, nprocs=args.gpus_node, args=(args.gpus_node, args))
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -97,7 +97,7 @@ def main_worker(rank, ngpus_per_node, args):
 
     # Construct dataset, dataloader for training split
     trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=args.bs, shuffle=True, num_workers=2, sampler=train_sampler)
+        trainset, batch_size=args.bs, num_workers=2, sampler=train_sampler)
 
     testset = torchvision.datasets.CIFAR10(
         root=args.save, train=False, download=True, transform=transform_test)
