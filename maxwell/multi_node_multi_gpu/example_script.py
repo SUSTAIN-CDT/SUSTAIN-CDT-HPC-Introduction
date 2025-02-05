@@ -134,14 +134,15 @@ def main_worker(gpu, args):
         testset, batch_size=args.bs, shuffle=False, num_workers=2)
 
     # Check if GPUs are available, if so set device to CUDA
-    device = args.rank
+    device = gpu
+    torch.cuda.set_device(gpu)
+    torch.backends.cudnn.benchmark = True
 
     # Initialise the VGG model
     print('==> Building model..')
     net = VGG()
     net = net.to(device) # Send to CUDA aka GPU
     net = torch.nn.parallel.DistributedDataParallel(net.to(rank), device_ids=[rank])
-    cudnn.benchmark = True
 
     criterion = nn.CrossEntropyLoss().to(device) # Loss Function
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4) # Optimizer
