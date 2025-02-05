@@ -5,6 +5,8 @@ import os
 import argparse
 from tqdm import tqdm
 import builtins
+import signal
+import subprocess
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -33,11 +35,31 @@ best_acc = 0
 def main():
     args = parser.parse_args()
 
-    # Since we have ngpus_per_node processes per node, the total world_size
-    # needs to be adjusted accordingly
-    args.world_size = args.gpus_node * args.num_nodes
-    # Use torch.multiprocessing.spawn to launch distributed processes: the
-    # main_worker process function
+    args.ngpus_per_node = torch.cuda.device_count()
+    if "SLURM_JOB_ID" in os.environ:
+        # single-node and multi-node distributed training on SLURM cluster
+        # requeue job on SLURM preemption
+        signal.signal(signal.SIGUSR1, handle_sigusr1)
+        signal.signal(signal.SIGTERM, handle_sigterm)
+        # find a common host name on all nodes
+        # assume scontrol returns hosts in the same order on all nodes
+        cmd = "scontrol show hostnames " + os.getenv("SLURM_JOB_NODELIST")
+        stdout = subprocess.check_output(cmd.split())
+        host_name = stdout.decode().splitlines()[0]
+        args.rank = int(os.getenv("SLURM_NODEID")) * args.ngpus_per_node
+        args.world_size = int(os.getenv("SLURM_NNODES")) * args.ngpus_per_node
+        args.dist_url = f"tcp://{host_name}:{args.port}"
+    else:
+        # single-node distributed training
+        args.rank = 0
+        args.dist_url = f"tcp://localhost:{args.port}"
+        args.world_size = args.ngpus_per_node
+
+    print("DISTRIBUTED SETTINGS")
+    print(f"WORLD SIZE: {args.world_size}")
+    print(f"GPUs per Node: {args.ngpus_per_node}")
+
+    torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
 
     print("DISTRIBUTED SETTINGS")
     print(f"WORLD SIZE: {args.world_size}")
@@ -45,21 +67,27 @@ def main():
 
     mp.spawn(main_worker, nprocs=args.gpus_node, args=(args.gpus_node, args))
 
-def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-
+def setup(args):
     # initialize the process group
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.distributed.init_process_group(
+        backend="nccl",
+        init_method=args.dist_url,
+        world_size=args.world_size,
+        rank=args.rank)
 
 def cleanup():
     dist.destroy_process_group()
 
-def main_worker(rank, ngpus_per_node, args):
+def handle_sigusr1(signum, frame):
+    os.system(f'scontrol requeue {os.environ["SLURM_JOB_ID"]}')
+    exit()
 
-    args.rank = rank
+def handle_sigterm(signum, frame):
+    pass
+
+def main_worker(gpu, args):
+    args.rank += gpu
     print(f"RANK {args.rank} PROCESS")
-    print(f"GPUs on Node: {ngpus_per_node}")
     print(f"CUDA devices: {torch.cuda.device_count()}")
 
     # suppress printing if not master
@@ -70,7 +98,7 @@ def main_worker(rank, ngpus_per_node, args):
 
         builtins.print = print_pass
 
-    setup(args.rank, args.world_size)
+    setup(args)
 
     print(f"print Process :{args.rank}")
     
