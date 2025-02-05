@@ -60,12 +60,6 @@ def main():
 
     torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
 
-    print("DISTRIBUTED SETTINGS")
-    print(f"WORLD SIZE: {args.world_size}")
-    print(f"GPUs per Node: {args.gpus_node}")
-
-    mp.spawn(main_worker, nprocs=args.gpus_node, args=(args.gpus_node, args))
-
 def setup(args):
     # initialize the process group
     torch.distributed.init_process_group(
@@ -142,7 +136,7 @@ def main_worker(gpu, args):
     print('==> Building model..')
     net = VGG()
     net = net.to(device) # Send to CUDA aka GPU
-    net = torch.nn.parallel.DistributedDataParallel(net.to(rank), device_ids=[rank])
+    net = torch.nn.parallel.DistributedDataParallel(net.to(device), device_ids=[device])
 
     criterion = nn.CrossEntropyLoss().to(device) # Loss Function
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4) # Optimizer
