@@ -14,6 +14,7 @@
 #SBATCH --mail-user=<username>@abdn.ac.uk 
 
 module load miniconda3
-source activate test
+source ~/.bashrc
+conda activate test
 
 srun python example_script.py --epochs=10 --save $HOME/sharedscratch/
